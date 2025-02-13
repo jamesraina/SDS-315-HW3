@@ -1,0 +1,445 @@
+---
+title: "SDS 315- Homework 3"
+author: "Raina James (rj24685)"
+output: html_document
+---
+**GitHub Repository**: [SDS-315 Homework 2 Repository]()
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message=FALSE, warning=FALSE)
+
+library(mosaic)
+library(dplyr)
+library(ggplot2)
+library(tibble)
+```
+
+## Question 1: Gas Prices Analysis
+
+### Competition vs. Price
+
+#### Claim: Gas stations charge more if they lack direct competition in sight.
+
+#### Evidence: 
+
+```{r}
+# Load the dataset
+gas_prices <- read.csv("gasprices.csv")
+
+# Data Cleaning and Preparation
+gas_prices <- gas_prices %>%
+  mutate(
+    Price = as.numeric(Price),
+    Competitors = trimws(Competitors)
+  )
+
+# Bootstrap the difference in means
+set.seed(42) # for reproducibility
+num_simulations <- 10000
+bootstrap_results_comp <- do(num_simulations) * {
+  boot_sample <- resample(gas_prices)
+  mean_no_comp <- mean(~Price, data = filter(boot_sample, Competitors == "N"))
+  mean_yes_comp <- mean(~Price, data = filter(boot_sample, Competitors == "Y"))
+  mean_no_comp - mean_yes_comp
+}
+
+# Calculate the confidence interval
+confidence_interval_comp <- quantile(bootstrap_results_comp$result, c(0.025, 0.975))
+
+# Create a results table
+competition_summary <- tibble(
+  Statistic = c("Lower Bound (2.5%)", "Upper Bound (97.5%)", "Mean Difference"),
+  Value_lower = round(confidence_interval_comp[1], 5),
+  Value_upper = round(confidence_interval_comp[2], 5),
+  Value_mean = round(mean(bootstrap_results_comp$result), 5)
+)
+
+# Print the table
+print(competition_summary)
+
+# Create a boxplot
+ggplot(gas_prices, aes(x = Competitors, y = Price)) +
+  geom_boxplot(fill = "skyblue", color = "black") +
+  labs(
+    title = "Gas Price vs. Competition",
+    x = "Competitors (Y/N)",
+    y = "Gas Price"
+  ) +
+  theme_minimal()
+
+```
+
+#### Conclusion: 
+The boxplot shows considerable overlap in price distributions between stations with and without competition. The 95% confidence interval for the price difference (-0.00755 to 0.0555) includes zero, indicating no strong evidence that competition significantly impacts gas prices. While there's a slight trend towards higher prices at stations without competition, this difference is not statistically significant. Therefore, we cannot conclusively support the claim that gas stations charge more if they lack direct competition in sight.
+
+### Income vs. Price
+
+#### Claim: The richer the area the higher the gas prices.
+
+#### Evidence: 
+
+```{r}
+# Ensure 'Price' and 'Income' are numeric
+gas_prices <- gas_prices %>%
+  mutate(Price = as.numeric(Price), Income = as.numeric(Income))
+
+# Bootstrap the correlation between Income and Price
+set.seed(42) # for reproducibility
+bootstrap_results_income <- do(num_simulations) * {
+  boot_sample <- resample(gas_prices)
+  cor(boot_sample$Income, boot_sample$Price)
+}
+
+# Calculate the confidence interval
+confidence_interval_income <- quantile(bootstrap_results_income$result, c(0.025, 0.975))
+
+# Create a results table
+income_summary <- tibble(
+  Statistic = c("Lower Bound (2.5%)", "Upper Bound (97.5%)", "Mean Correlation"),
+  Value_lower = round(confidence_interval_income[1], 5),
+  Value_upper = round(confidence_interval_income[2], 5),
+  Value_mean = round(mean(bootstrap_results_income$result), 5)
+)
+
+# Print the table
+print(income_summary)
+
+# Create a scatterplot with a trend line to show the relationship between Income and Price
+ggplot(gas_prices, aes(x = Income, y = Price)) +
+  geom_point(color = "lightgreen") + # Adding points
+  geom_smooth(method = "lm", color = "darkgreen") + # Adding trend line
+  labs(
+    title = "Gas Price vs. Income",
+    x = "Income",
+    y = "Gas Price"
+  ) +
+  theme_minimal()
+
+```
+
+#### Conclusion: 
+The scatterplot reveals a positive trend between area income and gas prices. The 95% confidence interval for the correlation (0.2 to 0.57) suggests a weak to moderate positive relationship. This indicates that as area income increases, gas prices tend to rise slightly, but the relationship isn't strong enough to make definitive predictions. While there's evidence supporting the theory that richer areas have higher gas prices, other factors likely play important roles in price determination.
+
+### Stoplight vs. Price
+
+#### Claim: Gas stations at stoplights charge more.
+
+#### Evidence: 
+```{r}
+# Data Preparation
+gas_prices <- gas_prices %>%
+  mutate(Price = as.numeric(Price), Stoplight = trimws(Stoplight))
+
+# Bootstrap the difference in means
+set.seed(42) # for reproducibility
+bootstrap_results_lights <- do(num_simulations) * {
+  boot_sample <- resample(gas_prices)
+  mean_at_light <- mean(~Price, data = filter(boot_sample, Stoplight == "Y"))
+  mean_no_light <- mean(~Price, data = filter(boot_sample, Stoplight == "N"))
+  mean_at_light - mean_no_light
+}
+
+# Calculate the confidence interval
+confidence_interval_lights <- quantile(bootstrap_results_lights$result, c(0.025, 0.975))
+
+# Create a results table
+stoplight_summary <- tibble(
+  Statistic = c("Lower Bound (2.5%)", "Upper Bound (97.5%)", "Mean Difference"),
+  Value_lower = round(confidence_interval_lights[1], 5),
+  Value_upper = round(confidence_interval_lights[2], 5),
+  Value_mean = round(mean(bootstrap_results_lights$result), 5)
+)
+
+# Print the table
+print(stoplight_summary)
+
+# Create a boxplot
+ggplot(gas_prices, aes(x = Stoplight, y = Price)) +
+  geom_boxplot(fill = "coral", color = "black") +
+  labs(
+    title = "Gas Price vs. Stoplight",
+    x = "Stoplight (Y/N)",
+    y = "Gas Price"
+  ) +
+  theme_minimal()
+
+```
+
+#### Conclusion: 
+The boxplot displays similar price distributions for gas stations with and without stoplights. The 95% confidence interval for the price difference (-0.0383 to 0.0304) includes zero, providing no strong evidence that stoplight presence affects gas prices. This suggests that the location of a gas station relative to a stoplight is not a significant factor in pricing. We cannot support the claim that gas stations at stoplights charge more based on this data.
+
+### Highway Access vs. Price
+
+#### Claim: Gas stations with direct highway access charge more.
+
+#### Evidence: 
+
+```{r}
+# Data Preparation
+gas_prices <- gas_prices %>%
+  mutate(Price = as.numeric(Price), Highway = trimws(Highway))
+
+# Bootstrap the difference in means
+set.seed(42) # for reproducibility
+bootstrap_results_highway <- do(num_simulations) * {
+  boot_sample <- resample(gas_prices)
+  mean_highway_access <- mean(~Price, data = filter(boot_sample, Highway == "Y"))
+  mean_no_highway_access <- mean(~Price, data = filter(boot_sample, Highway == "N"))
+  mean_highway_access - mean_no_highway_access
+}
+
+# Calculate the confidence interval
+confidence_interval_highway <- quantile(bootstrap_results_highway$result, c(0.025, 0.975))
+
+# Create a results table
+highway_summary <- tibble(
+  Statistic = c("Lower Bound (2.5%)", "Upper Bound (97.5%)", "Mean Difference"),
+  Value_lower = round(confidence_interval_highway[1], 5),
+  Value_upper = round(confidence_interval_highway[2], 5),
+  Value_mean = round(mean(bootstrap_results_highway$result), 5)
+)
+
+# Print the table
+print(highway_summary)
+
+# Create a boxplot
+ggplot(gas_prices, aes(x = Highway, y = Price)) +
+  geom_boxplot(fill = "gold", color = "black") +
+  labs(
+    title = "Gas Price vs. Highway Access",
+    x = "Highway Access (Y/N)",
+    y = "Gas Price"
+  ) +
+  theme_minimal()
+
+
+```
+
+#### Conclusion: 
+The boxplot shows a noticeable difference in price distributions between stations with and without highway access. The 95% confidence interval (0.00964 to 0.0828) is entirely above zero, strongly suggesting that gas stations with highway access tend to charge higher prices. This difference is statistically significant and economically meaningful, potentially due to higher demand or operating costs for highway-accessible stations. The data supports the theory that gas stations with direct highway access charge more.
+
+
+### Brand (Shell) vs. Price
+
+#### Claim: Shell charges more than all other non-Shell brands.
+
+#### Evidence: 
+
+```{r}
+# Data Preparation
+gas_prices <- gas_prices %>%
+  mutate(Price = as.numeric(Price), Brand = trimws(Brand))
+
+# Bootstrap the difference in means
+set.seed(42) # for reproducibility
+bootstrap_results_shell <- do(num_simulations) * {
+  boot_sample <- resample(gas_prices)
+  mean_shell_price <- mean(~Price, data = filter(boot_sample, Brand == "Shell"))
+  mean_non_shell_price <- mean(~Price, data = filter(boot_sample, Brand != "Shell"))
+  mean_shell_price - mean_non_shell_price
+}
+
+# Calculate the confidence interval
+confidence_interval_shell <- quantile(bootstrap_results_shell$result, c(0.025, 0.975))
+
+# Create a results table
+shell_summary <- tibble(
+  Statistic = c("Lower Bound (2.5%)", "Upper Bound (97.5%)", "Mean Difference"),
+  Value_lower = round(confidence_interval_shell[1], 5),
+  Value_upper = round(confidence_interval_shell[2], 5),
+  Value_mean = round(mean(bootstrap_results_shell$result), 5)
+)
+
+# Print the table
+print(shell_summary)
+
+# Create a boxplot
+ggplot(gas_prices, aes(x = Brand, y = Price)) +
+  geom_boxplot(fill = "pink", color = "black") +
+  labs(
+    title = "Gas Price vs. Brand (Shell)",
+    x = "Brand",
+    y = "Gas Price"
+  ) +
+  theme_minimal()
+
+```
+
+#### Conclusion: 
+The boxplot indicates similar price distributions for Shell and non-Shell stations, with slight differences. However, the 95% confidence interval for the price difference (-0.00937 to 0.0659) includes zero, suggesting no statistically significant price difference between Shell and other brands. While there's a slight trend towards higher prices at Shell stations, this difference isn't substantial enough to conclude that Shell consistently charges more than other brands. The data does not strongly support the claim that Shell charges more than all other non-Shell brands.
+
+## Question 2: S-Class Analysis
+
+### 2011 63 AMG Mileage
+```{r}
+# Read the data
+sclass <- read.csv("sclass.csv")
+
+# Filter the data
+sclass_2011_63AMG <- sclass %>%
+  filter(year == 2011 & trim == "63 AMG")
+
+# Bootstrap the mean mileage
+set.seed(42) # for reproducibility
+boot_mileage <- do(1000) * mean(resample(sclass_2011_63AMG$mileage))
+
+# Calculate the confidence interval
+ci_2011_mileage <- confint(boot_mileage, level = 0.95, method = "quantile")
+
+# Print the confidence interval
+print(ci_2011_mileage)
+```
+
+#### Conclusion:
+The average mileage of 2011 S-Class 63 AMGs hitting the used car market was between 26217.16 and 31794.430, with 95% confidence.
+
+### 2014 550 Black Color
+```{r}
+# Filter the data
+sclass_2014_550 <- sclass %>%
+  filter(year == 2014 & trim == "550")
+
+# Create a binary variable for black color
+sclass_2014_550 <- sclass_2014_550 %>%
+  mutate(isBlack = (color == "Black"))
+
+# Bootstrap the mean of isBlack
+set.seed(42) # for reproducibility
+boot_black <- do(1000) * mean(resample(sclass_2014_550$isBlack))
+
+# Calculate the confidence interval
+ci_2014_black <- confint(boot_black, level = 0.95, method = "quantile")
+
+# Print the confidence interval
+print(ci_2014_black)
+```
+
+#### Conclusion: 
+The interval for the proportion of all 2014 S-Class 550s that were painted black was between 0.4163898 and 0.4527605, with 95% confidence.
+
+## Question 3: NBC Pilot Survey Analysis
+
+### Living with Ed vs. My Name is Earl (Happiness)
+
+#### Question:
+Is there a significant difference in mean happiness ratings between viewers of "Living with Ed" and "My Name is Earl"?
+
+#### Approach:
+Conducted a t-test to construct a 95% confidence interval with 10000 simulations for the difference in mean viewer response to the Q1_Happy question.
+
+#### Results:
+```{r}
+# Read the data
+nbc_data <- read.csv("nbc_pilotsurvey.csv", stringsAsFactors = FALSE)
+
+# Filter the data
+Ed_nbc_data <- nbc_data %>%
+  filter(Show == "Living with Ed" | Show == "My Name is Earl")
+
+# Construct the 95% confidence interval
+ed_int <- confint(t.test(Q1_Happy ~ Show, data = Ed_nbc_data))
+
+# Print the confidence interval
+print(ed_int)
+ 
+```
+
+#### Conclusion:
+The 95% CI includes zero (-0.103 to 0.401), there is no strong evidence to conclude the difference in happiness levels between "Living with Ed" and "My Name is Earl" viewers.
+
+### The Biggest Loser vs. The Apprentice: Los Angeles (Annoyance)
+
+#### Question:
+Which reality/contest show, "The Biggest Loser" or "The Apprentice: Los Angeles," evokes a higher level of annoyance among viewers?
+
+#### Approach:
+Performed a t-test to construct a 95% confidence interval with 10000 simulations for the difference in mean viewer response to the Q1_Annoyed question.
+
+#### Results:
+```{r}
+# Filter the data
+LA_nbc_data <- nbc_data %>%
+  filter(Show %in% c("The Biggest Loser", "The Apprentice: Los Angeles"))
+
+# Construct the 95% confidence interval
+LA_int <- confint(t.test(Q1_Annoyed ~ Show, data = LA_nbc_data))
+
+# Print the confidence interval
+print(LA_int)
+ 
+```
+#### Conclusion:
+The 95% CI (0.017 to 0.525) does not include zero, indicating that "The Apprentice: Los Angeles" is associated with a significantly higher annoyance.
+
+### Dancing with the Stars (Confusion)
+
+#### Question:
+What proportion of American TV watchers find "Dancing with the Stars" confusing?
+
+#### Approach:
+Constructed a large-sample 95% confidence interval for the proportion of viewers who gave a response of 4 or greater to the "Q2_Confusing" question using prop.test.
+
+#### Results:
+
+```{r}
+# Filter the data
+stars_nbc_data <- nbc_data %>%
+  filter(Show == "Dancing with the Stars")
+
+# Create a binary variable for confusion
+stars_nbc_data <- stars_nbc_data %>%
+  mutate(Confusing_Binary = ifelse(Q2_Confusing >= 4, 1, 0))
+
+# Construct the 95% confidence interval
+stars_int <- confint(prop.test(sum(stars_nbc_data$Confusing_Binary), nrow(stars_nbc_data)))
+
+# Print the confidence interval
+print(stars_int)
+ 
+```
+
+#### Conclusion:
+The 95% CI (0.045 to 0.129) indicates that we can expect between 4.45% and 12.9% of American TV watchers that gave a response of 4 or greater. So, most people are not confused by this show.
+
+## Question 4: eBay Analysis
+
+#### Question:
+Does eBay's paid search advertising on Google generate additional revenue, or is it a waste of money?
+
+#### Approach:
+Computed the difference in revenue ratio between treatment and control DMAs and constructed a 95% confidence interval for the difference using a t-test.
+
+#### Results:
+```{r}
+# Read the data
+ebay <- read.csv("ebay.csv")
+
+# Create the revenue ratio variable
+ebay <- ebay %>%
+  mutate(revenue_ratio = rev_after / rev_before)
+
+# Compute the mean revenue ratio for treatment and control groups
+mean_ratios <- ebay %>%
+  group_by(adwords_pause) %>%
+  summarise(
+    mean_ratio = mean(revenue_ratio, na.rm = TRUE),
+    sd_ratio = sd(revenue_ratio, na.rm = TRUE),
+    n = n()
+  )
+
+# Compute the difference in mean revenue ratios
+diff_mean_ratio <- diff(mean_ratios$mean_ratio)
+
+# Perform a t-test for independent samples
+t_test_result <- t.test(revenue_ratio ~ adwords_pause, data = ebay)
+
+# Extract the confidence interval
+conf_interval <- t_test_result$conf.int
+
+# Print results
+print(paste("Difference in Revenue Ratio:", round(diff_mean_ratio, 4)))
+print(paste("95% Confidence Interval: [", round(conf_interval, 4), ",", round(conf_interval, 4), "]"))
+```
+
+#### Conclusion:
+The 95% confidence interval suggests that pausing paid search did not significantly reduce revenue, which imply that the ads had a positive effect.
